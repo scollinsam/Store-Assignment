@@ -26,7 +26,6 @@ def create_category():
         with connection.cursor() as cursor:
             name = request.POST.get("name")
             if name == "":
-                print('no-name')
                 result_dict["STATUS"] = "ERROR"
                 result_dict["MSG"] = "Name parameter is missing"
                 result_dict["CODE"] = "400-bad request"
@@ -35,11 +34,9 @@ def create_category():
             cursor.execute(query)
             result = cursor.fetchall()
             if result:
-                print('already exists')
                 result_dict["STATUS"] = "ERROR"
                 result_dict["MSG"] = "Category already exists"
                 result_dict["CODE"] = "200-category already exists"
-                print(result_dict)
                 return json.dumps(result_dict)
             sql = 'Insert Into categories(name) Values("{0}")'.format(name)
             cursor.execute(sql)
@@ -49,10 +46,8 @@ def create_category():
             result_dict["STATUS"] = "SUCCESS"
             result_dict["CAT_ID"] = auto_id
             result_dict["CODE"] = "201-category created successfully"
-            print(result_dict)
             return json.dumps(result_dict)
-    except Exception as e:
-        print(str(e))
+    except:
         result_dict["STATUS"] = "ERROR"
         result_dict["MSG"] = "Internal error"
         result_dict["CODE"] = "500-internal error"
@@ -68,7 +63,7 @@ def delete_category(id):
             cursor.execute(sql)
             result = cursor.fetchone()
             if not result:
-                result_dict["STATUS"] = "ERROR-The category was not deleted due to an error"
+                result_dict["STATUS"] = "ERROR"
                 result_dict["MSG"] = "Category not found"
                 result_dict["CODE"] = "404-category not found"
                 return json.dumps(result_dict)
@@ -117,8 +112,7 @@ def add_product():
             price = request.POST.get("price")
             img = request.POST.get("img_url")
             if title == "" or desc == "" or price == "" or img == "":
-                print('missing param')
-                result["STATUS"] = "ERROR-The product was not created/updated due to an error"
+                result["STATUS"] = "ERROR"
                 result["MSG"]= "missing parameters"
                 result["CODE"] = "400-bad request"
                 return json.dumps(result)
@@ -126,39 +120,125 @@ def add_product():
             cursor.execute(query)
             received = cursor.fetchone()
             if not received:
-                print('cat not found')
-                result["STATUS"] = "ERROR-The product was not created/updated due to an error"
+                result["STATUS"] = "ERROR"
                 result["MSG"]= "Category not found"
                 result["CODE"] = "404-category not found"
                 return json.dumps(result)
-            print(title)
             query = "Select * from products where title = '{}'".format(title)
             cursor.execute(query)
             received = cursor.fetchone()
             if not received:
-                print("insert")
                 sql = "INSERT INTO products (category, title, prod_desc, favorite, price, img_url) Values({}, '{}', '{}', '{}', {}, '{}')".format(category, title, desc, favorite, price, img)
                 cursor.execute(sql)
                 connection.commit()
             else:
-                print("update")
                 sql = "Update products SET prod_desc = '{}', favorite = '{}', price = {}, img_url = '{}' WHERE title = '{}'".format(desc, favorite, price, img, title)
                 cursor.execute(sql)
                 connection.commit()
             query = "SELECT * FROM products Where title = '{}'".format(title)
             cursor.execute(query)
             new_product = cursor.fetchall()
-            print(new_product)
-            result["STATUS"] = "SUCCESS-The product was created/updated successfully"
+            result["STATUS"] = "SUCCESS"
             result["PRODUCT_ID"]= new_product
-            result["CODE"] = "201-:Product created/updated successfully"
+            result["CODE"] = "201-Product created/updated successfully"
             return json.dumps(result)
-    except Exception as e:
-        print(str(e))
-        result["STATUS"] = "ERROR-The product was not created/updated due to an error"
+    except:
+        result["STATUS"] = "ERROR"
         result["MSG"] = "Internal error"
         result["CODE"] = "500-internal error"
         return json.dumps(result)
+
+
+@get('/product/<id>')
+def get_product(id):
+    result = {}
+    try:
+        with connection.cursor() as cursor:
+            sql = "SELECT * From products Where id = '{}'".format(id)
+            cursor.execute(sql)
+            received = cursor.fetchone()
+            if not received:
+                result["STATUS"] = "ERROR"
+                result["MSG"] = "Product not found"
+                result["CODE"] = "404-product not found"
+                return json.dumps(result)
+            result["STATUS"] = "SUCCESS"
+            result["PRODUCT"] = received
+            result["CODE"] = "200-product fetched successfully"
+            return json.dumps(result)
+    except:
+        result["STATUS"]="ERROR"
+        result["MSG"]="Internal error"
+        result["CODE"]="500-internal error"
+        return json.dumps(result)
+
+
+
+@delete('/product/<id>')
+def delete_product(id):
+    result = {}
+    try:
+        with connection.cursor() as cursor:
+            sql = "SELECT * From products Where id = '{}'".format(id)
+            cursor.execute(sql)
+            received = cursor.fetchone()
+            if not received:
+                result["STATUS"] = "ERROR"
+                result["MSG"] = "product not found"
+                result["CODE"] = "404-product not found"
+                return json.dumps(result)
+            query = "DELETE From products Where id = '{}'".format(id)
+            cursor.execute(query)
+            connection.commit()
+            result["STATUS"] = "SUCCESS-The product was deleted successfully"
+            result["CODE"] = "product deleted successfully"
+            return json.dumps(result)
+    except:
+        result["STATUS"] = "ERROR"
+        result["MSG"] = "Internal Error"
+        result["CODE"] = "500-internal error"
+        return json.dumps(result)
+
+
+@get('/products')
+def list_products():
+    result = {}
+    try:
+        with connection.cursor() as cursor:
+            query = "SELECT * FROM products"
+            cursor.execute(query)
+            output = cursor.fetchall()
+            result["STATUS"]="SUCCESS"
+            result["CODE"]="200-Success"
+            result["PRODUCTS"]=output
+            return json.dumps(result)
+    except:
+        result["STATUS"] = "ERROR"
+        result["CODE"] = "500-internal error"
+        result["MSG"] = "internal error"
+        return json.dumps(result)
+
+@get("/category/<id>/products")
+def list_products_by_category(id):
+    result = {}
+    try:
+        with connection.cursor() as cursor:
+            query = "SELECT * from products WHERE category = '{}'".format(id)
+            cursor.execute(query)
+            output = cursor.fetchall()
+            if not output:
+                result["STATUS"] = "ERROR"
+                result["CODE"] = "404-category not found"
+                return json.dumps(result)
+            result["STATUS"] = "SUCCESS"
+            result["PRODUCTS"] = output
+            result["CODE"] = "200-Success"
+            return json.dumps(result)
+    except:
+        result["STATUS"] = "ERROR"
+        result["MSG"] = "Internal error"
+        result["CODE"] = "500-internal error"
+
 
 
 
